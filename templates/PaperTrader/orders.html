@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<body style="
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(to bottom, black, DarkCyan);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: white;
+    font-family: Arial, sans-serif;
+">
+<head>
+    <title>Order History</title>
+</head>
+<body>
+    <h1>Order History</h1>
+
+    <table border="1">
+        <tr>
+            <th>Time & Date</th>
+            <th>Side</th>
+            <th>Ticker</th>
+            <th>Quantity</th>
+            <th>Price</th>
+            <th>P&L</th>
+        </tr>
+        {% for tx in transactions %}
+        <tr>
+            <td>{{ tx.timestamp }}</td>
+            <td>{{ tx.side }}</td>
+            <td>{{ tx.ticker }}</td>
+            <td>{{ tx.quantity }}</td>
+            <td>${{ tx.price }}</td>
+            <td>
+                {% if tx.side == "SELL" %}
+                    {% if tx.pnl > 0 %}
+                        <span style="color:darkgreen;">+${{ tx.pnl|floatformat:2 }}</span>
+                    {% elif tx.pnl < 0 %}
+                        <span style="color:red;">-${{ tx.pnl|floatformat:2|slice:'1:' }}</span>
+                    {% else %}
+                        <span>$0.00</span>
+                    {% endif %}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <br>
+    <a href="{% url 'home' %}">← Back to Portfolio</a>
+</body>
+</html>

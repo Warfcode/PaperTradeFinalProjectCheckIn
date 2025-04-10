@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<body style="
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(to bottom, black, darkgray);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: white;
+    font-family: Arial, sans-serif;
+">
+<head>
+    <title>{{ ticker }} | Chart</title>
+</head>
+<body>
+
+    <h1>{{ ticker }} - ${{ price|floatformat:2 }}</h1>
+
+    <!-- Timeframe selection -->
+    <form method="get">
+        <input type="hidden" name="ticker" value="{{ ticker }}">
+        <label for="timeframe">Timeframe:</label>
+        <select name="timeframe" onchange="this.form.submit()">
+            {% for tf in timeframes %}
+                <option value="{{ tf }}" {% if tf == selected_timeframe %}selected{% endif %}>{{ tf }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <!-- show chart -->
+    <div>{{ chart|safe }}</div>
+
+    <br><br>
+
+    <!-- buying screen -->
+    <form method="post">
+        {% csrf_token %}
+        <label>Quantity to Buy:</label>
+        <input type="number" name="quantity" min="1" required>
+        <button type="submit">Buy</button>
+    </form>
+
+    <br>
+    <a href="{% url 'home' %}">← Back to Portfolio</a>
+
+</body>
+</html>

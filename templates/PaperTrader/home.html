@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paper Trader</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(to bottom, black, silver);
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            background-size: cover;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <form method="get" action="{% url 'search_stock' %}">
+        <input type="text" name="ticker" placeholder="Search Ticker (e.g. AAPL)" required>
+        <button type="submit">Search</button>
+    </form>
+
+    <div style="text-align: right; margin-top: 5px;">
+        <a href="{% url 'orders' %}">View Orders</a>
+    </div>
+
+    <h1 style="text-align: center; margin-top: 20px;">
+        Portfolio Value: ${{ portfolio_value|floatformat:2 }}
+    </h1>
+
+    <div style="position: relative; max-width: 900px; margin: 40px auto;">
+        <canvas id="portfolioChart" style="height: 400px; width: 100%;"></canvas>
+
+        {% if market_closed %}
+        <div style="
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 48px;
+            font-weight: bold;
+            pointer-events: none;
+        ">
+            Market Closed
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const ctx = document.getElementById('portfolioChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Portfolio Value',
+                    data: {{ chart_data|safe }},
+                    parsing: {
+                        xAxisKey: 'x',
+                        yAxisKey: 'y'
+                    },
+                    borderColor: 'lime',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    tension: 0.2
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            tooltipFormat: 'hh:mm A',
+                            displayFormats: {
+                                minute: 'hh:mm A',
+                                hour: 'hh:mm A'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: "Time (EST)",
+                            color: "white"
+                        },
+                        ticks: {
+                            color: "white",
+                            major: { enabled: true }
+                        },
+                        grid: {
+                            color: "rgba(255, 255, 255, 0.1)",
+                            drawTicks: true
+                        },
+                        min: new Date().setHours(9, 30, 0, 0),
+                        max: new Date().setHours(16, 0, 0, 0)
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: "Value ($)",
+                            color: "white"
+                        },
+                        ticks: {
+                            color: "white"
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'white'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed.y.toLocaleString('en-US', {
+                                    style: 'currency',
+                                    currency: 'USD'
+                                });
+                                return `Value: ${value}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+    <p>Remaining Cash: ${{ cash|floatformat:2 }}</p>
+
+    <h2>My Positions:</h2>
+
+    <div style="margin-left: 20px;">
+        <table border="1">
+            <tr>
+                <th>Actions</th>
+                <th>Ticker</th>
+                <th>Quantity</th>
+                <th>Average Buy Price</th>
+                <th>Current Price</th>
+                <th>Value</th>
+                <th>Open P&amp;L</th>
+            </tr>
+            {% for h in holdings %}
+            <tr>
+                <td>
+                    <form method="get" action="{% url 'search_stock' %}" style="display:inline;">
+                        <input type="hidden" name="ticker" value="{{ h.ticker }}">
+                        <button type="submit">Buy</button>
+                    </form>
+
+                    <form method="get" action="{% url 'sell_stock' %}" style="display:inline;">
+                        <input type="hidden" name="ticker" value="{{ h.ticker }}">
+                        <button type="submit">Sell</button>
+                    </form>
+                </td>
+
+                <td>{{ h.ticker }}</td>
+                <td>{{ h.quantity }}</td>
+                <td>${{ h.average_price }}</td>
+                <td>${{ h.current_price|floatformat:2 }}</td>
+                <td>${{ h.value|floatformat:2 }}</td>
+                <td style="
+                    color: {% if h.open_pl > 0 %}
+                               darkgreen
+                           {% elif h.open_pl < 0 %}
+                               red
+                           {% else %}
+                               white
+                           {% endif %}
+                ;">
+                    {% if h.open_pl > 0 %}+{% endif %}
+                    ${{ h.open_pl|floatformat:2 }}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <footer>
+        <div style="text-align: center; margin-top: 50px;">
+            <form action="{% url 'reset_portfolio' %}" method="get">
+                <button type="submit" style="background-color: crimson; color: white; padding: 10px 20px; font-weight: bold;">
+                    Reset Portfolio
+                </button>
+            </form>
+        </div>
+    </footer>
+</body>
+</html>

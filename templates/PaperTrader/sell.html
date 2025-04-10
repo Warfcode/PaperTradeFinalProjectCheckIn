@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body style="
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(to bottom, black, FireBrick);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: white;
+    font-family: Arial, sans-serif;
+">
+<head>
+    <title>Sell {{ ticker }}</title>
+</head>
+<body>
+    <h1>Sell {{ ticker }}</h1>
+    <p>You currently own {{ quantity_owned }} shares.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <label for="quantity">Quantity to Sell:</label>
+        <input type="number" name="quantity" min="1" max="{{ quantity_owned }}" required>
+        <button type="submit">Sell</button>
+    </form>
+
+    <br>
+    <a href="{% url 'home' %}">← Back to Portfolio</a>
+</body>
+</html>

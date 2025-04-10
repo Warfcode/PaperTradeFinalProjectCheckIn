@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<body style="
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(to bottom, black, darkred);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    color: white;
+    font-family: Arial, sans-serif;
+">
+<head>
+    <title>Reset Portfolio</title>
+</head>
+<body>
+    <h1>Reset Portfolio</h1>
+    <p>This will delete all holdings, trades, and your current balance.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <label for="starting_cash">New Starting Amount ($):</label>
+        <input type="number" name="starting_cash" min="1" required>
+        <button type="submit">Reset</button>
+    </form>
+
+    <br>
+    <a href="{% url 'home' %}">← Back to Portfolio</a>
+</body>
+</html>
