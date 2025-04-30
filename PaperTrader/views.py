@@ -9,6 +9,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.timezone import now
 from datetime import datetime, time
 from pytz import timezone
+from django.http import JsonResponse
+
 
 
 def home(request):
@@ -50,8 +52,11 @@ def home(request):
         noon_et = eastern.localize(datetime.combine(datetime.now(), time(12, 0)))
         chart_data = [{
             "x": noon_et.isoformat(),
-            "y": float(portfolio.cash)
+            "y": float(total_value)
         }]
+        start_value = float(total_value)
+        y_min = start_value - 50
+        y_max = start_value + 50
     else:
         chart_data = [
             {
@@ -60,6 +65,13 @@ def home(request):
             }
             for s in snapshots
         ]
+
+        start_value = float(snapshots.first().value)
+        min_value = min(float(s.value) for s in snapshots)
+        max_value = max(float(s.value) for s in snapshots)
+        buffer = max(start_value * 0.01, 10)
+        y_min = min(start_value, min_value) - buffer
+        y_max = max(start_value, max_value) + buffer
 
     now_et = datetime.now(eastern)
     market_open = time(9, 30)
@@ -71,7 +83,9 @@ def home(request):
         "cash": portfolio.cash,
         "holdings": holding_data,
         "chart_data": chart_data,
-        "market_closed": market_closed
+        "market_closed": market_closed,
+        "chart_y_min": y_min,
+        "chart_y_max": y_max,
     })
 
 
@@ -127,7 +141,7 @@ def search_stock(request):
         messages.success(request, f"Bought {quantity} shares of {ticker} at ${current_price:.2f}")
         return redirect("home")
 
-    # Display stock info + chart
+    # Display stock info and chart
     yf_ticker = yf.Ticker(ticker)
     data = yf_ticker.history(period="60d", interval=timeframe)
 
@@ -207,7 +221,6 @@ def sell_stock(request):
         messages.success(request, f"Sold {quantity} shares of {ticker} at ${current_price:.2f} (P&L: ${pnl:.2f})")
         return redirect("home")
 
-    # GET request – render form
     return render(request, "PaperTrader/sell.html", {
         "ticker": ticker,
         "quantity_owned": holding.quantity
@@ -218,13 +231,13 @@ def reset_portfolio(request):
     if request.method == "POST":
         starting_cash = Decimal(request.POST.get("starting_cash"))
 
-        # Clear all related data
+        # Delete all data from database
         Holding.objects.all().delete()
         Stock.objects.all().delete()
         Transaction.objects.all().delete()
         Portfolio.objects.all().delete()
 
-        # Create new portfolio
+        # Newew portfolio creation
         Portfolio.objects.create(cash=starting_cash)
 
         messages.success(request, f"Portfolio reset to ${starting_cash:.2f}")
@@ -232,3 +245,48 @@ def reset_portfolio(request):
 
     return render(request, "PaperTrader/reset.html")
 
+
+
+def live_portfolio_data(request):
+    holdings = Holding.objects.all()
+    portfolio = Portfolio.objects.first()
+
+    eastern = timezone("US/Eastern")
+    today = now().date()
+
+    snapshots = PortfolioSnapshot.objects.filter(timestamp__date=today).order_by('timestamp')
+    chart_data = [
+        {
+            "x": s.timestamp.astimezone(eastern).isoformat(),
+            "y": float(s.value)
+        }
+        for s in snapshots
+    ]
+
+    holding_data = []
+    total_stock_value = 0
+    for h in holdings:
+        ticker = h.stock.ticker
+        data = yf.Ticker(ticker).history(period="1d")
+        current_price = data["Close"].iloc[-1] if not data.empty else 0
+        value = current_price * h.quantity
+        total_stock_value += value
+        open_pl = (current_price - float(h.average_price)) * h.quantity
+
+        holding_data.append({
+            "ticker": ticker,
+            "quantity": h.quantity,
+            "average_price": float(h.average_price),
+            "current_price": float(current_price),
+            "value": float(value),
+            "open_pl": float(open_pl),
+        })
+
+    total_value = total_stock_value + float(portfolio.cash)
+
+    return JsonResponse({
+        "portfolio_value": total_value,
+        "cash": float(portfolio.cash),
+        "holdings": holding_data,
+        "chart_data": chart_data,
+    })

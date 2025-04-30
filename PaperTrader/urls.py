@@ -7,6 +7,6 @@ urlpatterns = [
     path('orders/', views.orders, name='orders'),
     path('sell/', views.sell_stock, name='sell_stock'),
     path('reset/', views.reset_portfolio, name='reset_portfolio'),
-
+    path("api/live-data/", views.live_portfolio_data, name="live_data")
 
 ]

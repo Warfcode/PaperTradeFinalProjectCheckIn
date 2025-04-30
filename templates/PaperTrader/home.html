@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Paper Trader</title>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
@@ -29,7 +30,7 @@
     </div>
 
     <h1 style="text-align: center; margin-top: 20px;">
-        Portfolio Value: ${{ portfolio_value|floatformat:2 }}
+        Portfolio Value: <span id="portfolioValueNum">${{ portfolio_value|floatformat:2 }}</span>
     </h1>
 
     <div style="position: relative; max-width: 900px; margin: 40px auto;">
@@ -73,10 +74,10 @@
                     x: {
                         type: 'time',
                         time: {
-                            tooltipFormat: 'hh:mm A',
+                            tooltipFormat: 'hh:mm a',
                             displayFormats: {
-                                minute: 'hh:mm A',
-                                hour: 'hh:mm A'
+                                minute: 'hh:mm a',
+                                hour: 'hh:mm a'
                             }
                         },
                         title: {
@@ -86,7 +87,9 @@
                         },
                         ticks: {
                             color: "white",
-                            major: { enabled: true }
+                            major: { enabled: true },
+                            autoSkip: false,
+                            maxTicksLimit: 33
                         },
                         grid: {
                             color: "rgba(255, 255, 255, 0.1)",
@@ -96,6 +99,8 @@
                         max: new Date().setHours(16, 0, 0, 0)
                     },
                     y: {
+                        min: {{ chart_y_min|floatformat:2 }},
+                        max: {{ chart_y_max|floatformat:2 }},
                         title: {
                             display: true,
                             text: "Value ($)",
@@ -128,56 +133,116 @@
         });
     </script>
 
-    <p>Remaining Cash: ${{ cash|floatformat:2 }}</p>
+    <p style="text-align: left; margin-left: 25px; font-size: 18px;">
+        Remaining Cash: <span id="cashValueNum">${{ cash|floatformat:2 }}</span>
+    </p>
 
-    <h2>My Positions:</h2>
+    <h2 style="margin-left: 25px;">My Positions:</h2>
 
     <div style="margin-left: 20px;">
         <table border="1">
-            <tr>
-                <th>Actions</th>
-                <th>Ticker</th>
-                <th>Quantity</th>
-                <th>Average Buy Price</th>
-                <th>Current Price</th>
-                <th>Value</th>
-                <th>Open P&amp;L</th>
-            </tr>
-            {% for h in holdings %}
-            <tr>
-                <td>
-                    <form method="get" action="{% url 'search_stock' %}" style="display:inline;">
-                        <input type="hidden" name="ticker" value="{{ h.ticker }}">
-                        <button type="submit">Buy</button>
-                    </form>
+            <thead>
+                <tr>
+                    <th>Actions</th>
+                    <th>Ticker</th>
+                    <th>Quantity</th>
+                    <th>Average Buy Price</th>
+                    <th>Current Price</th>
+                    <th>Value</th>
+                    <th>Open P&amp;L</th>
+                </tr>
+            </thead>
+            <tbody id="holdingsBody">
+                {% for h in holdings %}
+                <tr>
+                    <td>
+                        <form method="get" action="{% url 'search_stock' %}" style="display:inline;">
+                            <input type="hidden" name="ticker" value="{{ h.ticker }}">
+                            <button type="submit">Buy</button>
+                        </form>
 
-                    <form method="get" action="{% url 'sell_stock' %}" style="display:inline;">
-                        <input type="hidden" name="ticker" value="{{ h.ticker }}">
-                        <button type="submit">Sell</button>
-                    </form>
-                </td>
+                        <form method="get" action="{% url 'sell_stock' %}" style="display:inline;">
+                            <input type="hidden" name="ticker" value="{{ h.ticker }}">
+                            <button type="submit">Sell</button>
+                        </form>
+                    </td>
 
-                <td>{{ h.ticker }}</td>
-                <td>{{ h.quantity }}</td>
-                <td>${{ h.average_price }}</td>
-                <td>${{ h.current_price|floatformat:2 }}</td>
-                <td>${{ h.value|floatformat:2 }}</td>
-                <td style="
-                    color: {% if h.open_pl > 0 %}
-                               darkgreen
-                           {% elif h.open_pl < 0 %}
-                               red
-                           {% else %}
-                               white
-                           {% endif %}
-                ;">
-                    {% if h.open_pl > 0 %}+{% endif %}
-                    ${{ h.open_pl|floatformat:2 }}
-                </td>
-            </tr>
-            {% endfor %}
+                    <td>{{ h.ticker }}</td>
+                    <td>{{ h.quantity }}</td>
+                    <td>${{ h.average_price }}</td>
+                    <td>${{ h.current_price|floatformat:2 }}</td>
+                    <td>${{ h.value|floatformat:2 }}</td>
+                    <td style="
+                        color: {% if h.open_pl > 0 %}
+                                   darkgreen
+                               {% elif h.open_pl < 0 %}
+                                   red
+                               {% else %}
+                                   white
+                               {% endif %}
+                    ;">
+                        {% if h.open_pl > 0 %}+{% endif %}
+                        ${{ h.open_pl|floatformat:2 }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
+
     </div>
+
+
+
+<script>
+function updateDashboard() {
+    fetch("{% url 'live_data' %}")
+        .then(response => response.json())
+        .then(data => {
+            const portfolioNumEl = document.getElementById("portfolioValueNum");
+            const newPortfolioNum = "$" + data.portfolio_value.toFixed(2);
+            if (portfolioNumEl.textContent !== newPortfolioNum) {
+                portfolioNumEl.textContent = newPortfolioNum;
+            }
+
+            const cashNumEl = document.getElementById("cashValueNum");
+            const newCashNum = "$" + data.cash.toFixed(2);
+            if (cashNumEl.textContent !== newCashNum) {
+                cashNumEl.textContent = newCashNum;
+            }
+
+            const tbody = document.getElementById("holdingsBody");
+            tbody.innerHTML = "";
+            data.holdings.forEach(h => {
+                const row = document.createElement("tr");
+                const color = h.open_pl > 0 ? "darkgreen" : h.open_pl < 0 ? "red" : "white";
+
+                row.innerHTML = `
+                    <td>
+                        <form method="get" action="/search/"><input type="hidden" name="ticker" value="${h.ticker}"><button>Buy</button></form>
+                        <form method="get" action="/sell/"><input type="hidden" name="ticker" value="${h.ticker}"><button>Sell</button></form>
+                    </td>
+                    <td>${h.ticker}</td>
+                    <td>${h.quantity}</td>
+                    <td>$${h.average_price.toFixed(2)}</td>
+                    <td>$${h.current_price.toFixed(2)}</td>
+                    <td>$${h.value.toFixed(2)}</td>
+                    <td style="color: ${color};">
+                        ${h.open_pl > 0 ? '+' : ''}$${h.open_pl.toFixed(2)}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            chart.data.datasets[0].data = data.chart_data;
+            chart.update();
+        });
+}
+
+setInterval(updateDashboard, 5000);
+</script>
+
+
+
 
     <footer>
         <div style="text-align: center; margin-top: 50px;">
